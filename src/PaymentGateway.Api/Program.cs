@@ -14,6 +14,15 @@ builder.Services.AddSingleton<PaymentsRepository>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PaymentRequestValidator>();
 
+var bankBaseUrl = builder.Configuration["Bank:BaseUrl"]
+    ?? throw new InvalidOperationException("Bank:BaseUrl is not configured.");
+
+builder.Services.AddHttpClient<IBankClient, BankClient>(client =>
+{
+    client.BaseAddress = new Uri(bankBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
