@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 using PaymentGateway.Api.Controllers;
+using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Services;
 
@@ -17,15 +18,14 @@ public class PaymentsControllerTests
     public async Task RetrievesAPaymentSuccessfully()
     {
         // Arrange
-        var payment = new PostPaymentResponse
-        {
-            Id = Guid.NewGuid(),
-            ExpiryYear = _random.Next(2023, 2030),
-            ExpiryMonth = _random.Next(1, 12),
-            Amount = _random.Next(1, 10000),
-            CardNumberLastFour = _random.Next(1111, 9999).ToString(),
-            Currency = "GBP"
-        };
+        var payment = new Payment(
+            Id: Guid.NewGuid(),
+            Status: PaymentStatus.Declined,
+            CardNumberLastFour: _random.Next(1111, 9999).ToString(),
+            ExpiryMonth: _random.Next(1, 13),
+            ExpiryYear: _random.Next(2027, 2035),
+            Currency: "GBP",
+            Amount: _random.Next(1, 10000));
 
         var paymentsRepository = new PaymentsRepository();
         paymentsRepository.Add(payment);
@@ -33,16 +33,23 @@ public class PaymentsControllerTests
         var webApplicationFactory = new WebApplicationFactory<PaymentsController>();
         var client = webApplicationFactory.WithWebHostBuilder(builder =>
             builder.ConfigureServices(services => ((ServiceCollection)services)
-                .AddSingleton(paymentsRepository)))
+                .AddSingleton<IPaymentsRepository>(paymentsRepository)))
             .CreateClient();
 
         // Act
         var response = await client.GetAsync($"/api/Payments/{payment.Id}");
-        var paymentResponse = await response.Content.ReadFromJsonAsync<PostPaymentResponse>();
-        
+        var paymentResponse = await response.Content.ReadFromJsonAsync<GetPaymentResponse>();
+
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(paymentResponse);
+        Assert.Equal(payment.Id, paymentResponse!.Id);
+        Assert.Equal(payment.Status, paymentResponse.Status);
+        Assert.Equal(payment.CardNumberLastFour, paymentResponse.CardNumberLastFour);
+        Assert.Equal(payment.ExpiryMonth, paymentResponse.ExpiryMonth);
+        Assert.Equal(payment.ExpiryYear, paymentResponse.ExpiryYear);
+        Assert.Equal(payment.Currency, paymentResponse.Currency);
+        Assert.Equal(payment.Amount, paymentResponse.Amount);
     }
 
     [Fact]
