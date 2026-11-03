@@ -13,6 +13,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IPaymentsRepository, PaymentsRepository>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PaymentRequestValidator>();
+builder.Services.AddScoped<PaymentService>();
 
 var bankBaseUrl = builder.Configuration["Bank:BaseUrl"]
     ?? throw new InvalidOperationException("Bank:BaseUrl is not configured.");
