@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using PaymentGateway.Api.Exceptions;
 using PaymentGateway.Api.Models.Bank;
 
 namespace PaymentGateway.Api.Services;
@@ -13,19 +14,19 @@ public class BankClient : IBankClient
         _httpClient = httpClient;
     }
 
-    public async Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request, CancellationToken cancellationToken = default)
+    public async Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request)
     {
         HttpResponseMessage response;
 
         try
         {
-            response = await _httpClient.PostAsJsonAsync("payments", request, cancellationToken);
+            response = await _httpClient.PostAsJsonAsync("payments", request);
         }
         catch (HttpRequestException ex)
         {
             throw new BankUnavailableException("Could not reach the acquiring bank.", ex);
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException ex)
         {
             throw new BankUnavailableException("The acquiring bank did not respond in time.", ex);
         }
@@ -39,7 +40,7 @@ public class BankClient : IBankClient
 
             try
             {
-                var bankResponse = await response.Content.ReadFromJsonAsync<BankPaymentResponse>(cancellationToken: cancellationToken);
+                var bankResponse = await response.Content.ReadFromJsonAsync<BankPaymentResponse>();
 
                 return bankResponse ?? throw new BankUnavailableException("The acquiring bank returned an empty response.");
             }

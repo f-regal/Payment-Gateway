@@ -1,3 +1,4 @@
+using PaymentGateway.Api.Exceptions;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Models.Requests;
@@ -130,7 +131,7 @@ public class PaymentServiceTests
 
         public List<BankPaymentRequest> Requests { get; } = new();
 
-        public Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request, CancellationToken cancellationToken = default)
+        public Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request)
         {
             Requests.Add(request);
 

@@ -22,7 +22,7 @@ public class PaymentService
         _paymentsRepository = paymentsRepository;
     }
 
-    public async Task<PaymentResult> ProcessPaymentAsync(PostPaymentRequest request, CancellationToken cancellationToken = default)
+    public async Task<PaymentResult> ProcessPaymentAsync(PostPaymentRequest request)
     {
         var errors = _validator.Validate(request);
 
@@ -45,7 +45,7 @@ public class PaymentService
             Amount: amount,
             Cvv: cvv);
 
-        var bankResponse = await _bankClient.ProcessPaymentAsync(bankRequest, cancellationToken);
+        var bankResponse = await _bankClient.ProcessPaymentAsync(bankRequest);
 
         var payment = new Payment(
             Id: Guid.NewGuid(),

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
+using PaymentGateway.Api.Exceptions;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Services;
 
@@ -99,16 +100,6 @@ public class BankClientTests
         var client = CreateClient(_ => Task.FromResult(JsonResponse(HttpStatusCode.OK, "not json")));
 
         await Assert.ThrowsAsync<BankUnavailableException>(() => client.ProcessPaymentAsync(Request));
-    }
-
-    [Fact]
-    public async Task DoesNotWrapCancellation_WhenCallerCancels()
-    {
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        var client = CreateClient(_ => throw new TaskCanceledException());
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.ProcessPaymentAsync(Request, cts.Token));
     }
 
     [Theory]
