@@ -3,6 +3,7 @@ using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Services;
+using PaymentGateway.Api.Tests.Fakes;
 using PaymentGateway.Api.Validation;
 
 namespace PaymentGateway.Api.Tests.Services;
@@ -121,27 +122,6 @@ public class PaymentServiceTests
         var second = await _service.ProcessPaymentAsync(ValidRequest());
 
         Assert.NotEqual(first.Payment!.Id, second.Payment!.Id);
-    }
-
-    private sealed class FakeBankClient : IBankClient
-    {
-        public BankPaymentResponse Response { get; set; } = new(Authorized: true, AuthorizationCode: "auth-code");
-
-        public Exception? Exception { get; set; }
-
-        public List<BankPaymentRequest> Requests { get; } = new();
-
-        public Task<BankPaymentResponse> ProcessPaymentAsync(BankPaymentRequest request)
-        {
-            Requests.Add(request);
-
-            if (Exception is not null)
-            {
-                throw Exception;
-            }
-
-            return Task.FromResult(Response);
-        }
     }
 
     private sealed class RecordingPaymentsRepository : IPaymentsRepository
