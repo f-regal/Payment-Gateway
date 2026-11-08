@@ -75,7 +75,7 @@ public class PaymentsControllerTests : IDisposable
 
         // Act
         var response = await _client.GetAsync($"/api/Payments/{payment.Id}");
-        var paymentResponse = await response.Content.ReadFromJsonAsync<GetPaymentResponse>(JsonOptions);
+        var paymentResponse = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -105,7 +105,7 @@ public class PaymentsControllerTests : IDisposable
         _bankClient.Response = new BankPaymentResponse(Authorized: true, AuthorizationCode: "auth-code");
 
         var response = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
-        var payment = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
+        var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(payment);
@@ -124,7 +124,7 @@ public class PaymentsControllerTests : IDisposable
         _bankClient.Response = new BankPaymentResponse(Authorized: false, AuthorizationCode: null);
 
         var response = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
-        var payment = await response.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
+        var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(PaymentStatus.Declined, payment!.Status);
@@ -168,10 +168,10 @@ public class PaymentsControllerTests : IDisposable
     public async Task PostPayment_CanBeRetrievedWithGet()
     {
         var postResponse = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
-        var created = await postResponse.Content.ReadFromJsonAsync<PostPaymentResponse>(JsonOptions);
+        var created = await postResponse.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         var getResponse = await _client.GetAsync($"/api/Payments/{created!.Id}");
-        var retrieved = await getResponse.Content.ReadFromJsonAsync<GetPaymentResponse>(JsonOptions);
+        var retrieved = await getResponse.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         Assert.NotNull(retrieved);

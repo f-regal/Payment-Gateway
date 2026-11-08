@@ -1,7 +1,6 @@
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Models.Requests;
-using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Validation;
 
 namespace PaymentGateway.Api.Services;
@@ -58,17 +57,6 @@ public class PaymentService
 
         _paymentsRepository.Add(payment);
 
-        return PaymentResult.Processed(ToPostPaymentResponse(payment));
+        return PaymentResult.Processed(payment);
     }
-
-    private static PostPaymentResponse ToPostPaymentResponse(Payment payment) => new()
-    {
-        Id = payment.Id,
-        Status = payment.Status,
-        CardNumberLastFour = payment.CardNumberLastFour,
-        ExpiryMonth = payment.ExpiryMonth,
-        ExpiryYear = payment.ExpiryYear,
-        Currency = payment.Currency,
-        Amount = payment.Amount
-    };
 }

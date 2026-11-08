@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
 using PaymentGateway.Api.Exceptions;
-using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Requests;
 using PaymentGateway.Api.Models.Responses;
 using PaymentGateway.Api.Services;
@@ -50,11 +49,11 @@ public class PaymentsController : Controller
             return BadRequest(new RejectedPaymentResponse(result.Errors));
         }
 
-        return Ok(result.Payment);
+        return Ok(PaymentResponse.From(result.Payment!));
     }
 
     [HttpGet("{id:guid}")]
-    public ActionResult<GetPaymentResponse> GetPayment(Guid id)
+    public ActionResult<PaymentResponse> GetPayment(Guid id)
     {
         var payment = _paymentsRepository.Get(id);
 
@@ -63,17 +62,6 @@ public class PaymentsController : Controller
             return NotFound();
         }
 
-        return Ok(ToGetPaymentResponse(payment));
+        return Ok(PaymentResponse.From(payment));
     }
-
-    private static GetPaymentResponse ToGetPaymentResponse(Payment payment) => new()
-    {
-        Id = payment.Id,
-        Status = payment.Status,
-        CardNumberLastFour = payment.CardNumberLastFour,
-        ExpiryMonth = payment.ExpiryMonth,
-        ExpiryYear = payment.ExpiryYear,
-        Currency = payment.Currency,
-        Amount = payment.Amount
-    };
 }
