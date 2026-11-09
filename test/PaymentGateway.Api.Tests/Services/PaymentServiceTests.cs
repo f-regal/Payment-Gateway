@@ -1,7 +1,13 @@
+using System.Diagnostics.Metrics;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using PaymentGateway.Api.Exceptions;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Models.Requests;
+using PaymentGateway.Api.Observability;
 using PaymentGateway.Api.Services;
 using PaymentGateway.Api.Tests.Fakes;
 using PaymentGateway.Api.Validation;
@@ -14,12 +20,18 @@ public class PaymentServiceTests
 
     private readonly FakeBankClient _bankClient = new();
     private readonly RecordingPaymentsRepository _repository = new();
+    private readonly IMeterFactory _meterFactory = new ServiceCollection().AddMetrics().BuildServiceProvider().GetRequiredService<IMeterFactory>();
     private readonly PaymentService _service;
 
     public PaymentServiceTests()
     {
         var validator = new PaymentRequestValidator(new FixedTimeProvider(Today));
-        _service = new PaymentService(validator, _bankClient, _repository);
+        _service = new PaymentService(
+            validator,
+            _bankClient,
+            _repository,
+            new PaymentMetrics(_meterFactory),
+            NullLogger<PaymentService>.Instance);
     }
 
     private static PostPaymentRequest ValidRequest() => new()
@@ -122,6 +134,46 @@ public class PaymentServiceTests
         var second = await _service.ProcessPaymentAsync(ValidRequest());
 
         Assert.NotEqual(first.Payment!.Id, second.Payment!.Id);
+    }
+
+    [Fact]
+    public async Task RecordsOutcomeMetricForEachPayment()
+    {
+        var outcomes = new List<string>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Scope == _meterFactory && instrument.Name == PaymentMetrics.PaymentsCounterName)
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "outcome")
+                {
+                    outcomes.Add((string)tag.Value!);
+                }
+            }
+        });
+        listener.Start();
+
+        _bankClient.Response = new BankPaymentResponse(Authorized: true, AuthorizationCode: "auth-code");
+        await _service.ProcessPaymentAsync(ValidRequest());
+
+        _bankClient.Response = new BankPaymentResponse(Authorized: false, AuthorizationCode: null);
+        await _service.ProcessPaymentAsync(ValidRequest());
+
+        var invalid = ValidRequest();
+        invalid.Cvv = null;
+        await _service.ProcessPaymentAsync(invalid);
+
+        _bankClient.Exception = new BankUnavailableException("Bank down");
+        await Assert.ThrowsAsync<BankUnavailableException>(() => _service.ProcessPaymentAsync(ValidRequest()));
+
+        Assert.Equal(new[] { "authorized", "declined", "rejected", "bank_unavailable" }, outcomes);
     }
 
     private sealed class RecordingPaymentsRepository : IPaymentsRepository

@@ -9,23 +9,22 @@ namespace PaymentGateway.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Produces("application/json")]
 public class PaymentsController : Controller
 {
     private readonly IPaymentsRepository _paymentsRepository;
     private readonly PaymentService _paymentService;
-    private readonly ILogger<PaymentsController> _logger;
 
-    public PaymentsController(
-        IPaymentsRepository paymentsRepository,
-        PaymentService paymentService,
-        ILogger<PaymentsController> logger)
+    public PaymentsController(IPaymentsRepository paymentsRepository, PaymentService paymentService)
     {
         _paymentsRepository = paymentsRepository;
         _paymentService = paymentService;
-        _logger = logger;
     }
 
     [HttpPost]
+    [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(RejectedPaymentResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
     public async Task<IActionResult> ProcessPayment(PostPaymentRequest request)
     {
         PaymentResult result;
@@ -34,10 +33,8 @@ public class PaymentsController : Controller
         {
             result = await _paymentService.ProcessPaymentAsync(request);
         }
-        catch (BankUnavailableException ex)
+        catch (BankUnavailableException)
         {
-            _logger.LogWarning(ex, "Payment could not be processed because the acquiring bank is unavailable.");
-
             return Problem(
                 statusCode: StatusCodes.Status502BadGateway,
                 title: "The acquiring bank is unavailable.",
@@ -49,10 +46,14 @@ public class PaymentsController : Controller
             return BadRequest(new RejectedPaymentResponse(result.Errors));
         }
 
-        return Ok(PaymentResponse.From(result.Payment!));
+        var response = PaymentResponse.From(result.Payment!);
+
+        return CreatedAtAction(nameof(GetPayment), new { id = response.Id }, response);
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public ActionResult<PaymentResponse> GetPayment(Guid id)
     {
         var payment = _paymentsRepository.Get(id);

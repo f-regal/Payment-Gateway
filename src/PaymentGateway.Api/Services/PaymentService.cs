@@ -1,6 +1,8 @@
+using PaymentGateway.Api.Exceptions;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Models.Bank;
 using PaymentGateway.Api.Models.Requests;
+using PaymentGateway.Api.Observability;
 using PaymentGateway.Api.Validation;
 
 namespace PaymentGateway.Api.Services;
@@ -10,15 +12,21 @@ public class PaymentService
     private readonly PaymentRequestValidator _validator;
     private readonly IBankClient _bankClient;
     private readonly IPaymentsRepository _paymentsRepository;
+    private readonly PaymentMetrics _metrics;
+    private readonly ILogger<PaymentService> _logger;
 
     public PaymentService(
         PaymentRequestValidator validator,
         IBankClient bankClient,
-        IPaymentsRepository paymentsRepository)
+        IPaymentsRepository paymentsRepository,
+        PaymentMetrics metrics,
+        ILogger<PaymentService> logger)
     {
         _validator = validator;
         _bankClient = bankClient;
         _paymentsRepository = paymentsRepository;
+        _metrics = metrics;
+        _logger = logger;
     }
 
     public async Task<PaymentResult> ProcessPaymentAsync(PostPaymentRequest request)
@@ -27,6 +35,9 @@ public class PaymentService
 
         if (errors.Count > 0)
         {
+            _logger.LogInformation("Payment rejected with {ErrorCount} validation errors", errors.Count);
+            _metrics.RecordOutcome("rejected");
+
             return PaymentResult.Rejected(errors);
         }
 
@@ -44,7 +55,19 @@ public class PaymentService
             Amount: amount,
             Cvv: cvv);
 
-        var bankResponse = await _bankClient.ProcessPaymentAsync(bankRequest);
+        BankPaymentResponse bankResponse;
+
+        try
+        {
+            bankResponse = await _bankClient.ProcessPaymentAsync(bankRequest);
+        }
+        catch (BankUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Payment not processed because the acquiring bank is unavailable");
+            _metrics.RecordOutcome("bank_unavailable");
+
+            throw;
+        }
 
         var payment = new Payment(
             Id: Guid.NewGuid(),
@@ -56,6 +79,9 @@ public class PaymentService
             Amount: amount);
 
         _paymentsRepository.Add(payment);
+
+        _logger.LogInformation("Payment {PaymentId} processed with status {Status}", payment.Id, payment.Status);
+        _metrics.RecordOutcome(payment.Status.ToString().ToLowerInvariant());
 
         return PaymentResult.Processed(payment);
     }

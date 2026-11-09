@@ -107,7 +107,7 @@ public class PaymentsControllerTests : IDisposable
         var response = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(payment);
         Assert.NotEqual(Guid.Empty, payment!.Id);
         Assert.Equal(PaymentStatus.Authorized, payment.Status);
@@ -126,7 +126,7 @@ public class PaymentsControllerTests : IDisposable
         var response = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal(PaymentStatus.Declined, payment!.Status);
     }
 
@@ -165,12 +165,15 @@ public class PaymentsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task PostPayment_CanBeRetrievedWithGet()
+    public async Task PostPayment_ReturnsLocationOfCreatedPayment_ThatCanBeRetrievedWithGet()
     {
         var postResponse = await _client.PostAsJsonAsync("/api/Payments", ValidRequest());
         var created = await postResponse.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
-        var getResponse = await _client.GetAsync($"/api/Payments/{created!.Id}");
+        Assert.NotNull(postResponse.Headers.Location);
+        Assert.EndsWith($"/api/Payments/{created!.Id}", postResponse.Headers.Location!.ToString());
+
+        var getResponse = await _client.GetAsync(postResponse.Headers.Location);
         var retrieved = await getResponse.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -229,5 +232,14 @@ public class PaymentsControllerTests : IDisposable
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal("The acquiring bank is unavailable.", body.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task Health_ReturnsHealthy()
+    {
+        var response = await _client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 }

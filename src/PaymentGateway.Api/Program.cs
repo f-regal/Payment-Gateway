@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using PaymentGateway.Api.Observability;
 using PaymentGateway.Api.Services;
 using PaymentGateway.Api.Validation;
 
@@ -17,6 +18,8 @@ builder.Services.AddSingleton<IPaymentsRepository, PaymentsRepository>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PaymentRequestValidator>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddSingleton<PaymentMetrics>();
+builder.Services.AddHealthChecks();
 
 var bankBaseUrl = builder.Configuration["Bank:BaseUrl"]
     ?? throw new InvalidOperationException("Bank:BaseUrl is not configured.");
@@ -41,5 +44,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
